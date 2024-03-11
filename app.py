@@ -6,6 +6,7 @@ import time
 import math
 import ffmpeg
 import pathlib
+import os
 
 # Check if NVIDIA GPU is available
 torch.cuda.is_available()
@@ -33,7 +34,7 @@ app = Flask(__name__)
 def hello():
     return "Whisper Hello World!"
 
-@app.route("/whisper", methods=[POST])
+@app.route("/whisper", methods=["POST"])
 def handler():
     if not request.files:
         #If no file is submitted return a 400 (Bad Request)
@@ -43,17 +44,25 @@ def handler():
     results = []
         
     for filename, handle in request.files.items():
+
+        fname = request.files[filename].name[:-4]
+        print(fname)
+
         # Create a temporary file.
         # The location of the temporary file is available in `temp.name`.
         temp = NamedTemporaryFile()
-        temp2 = NamedTemporaryFile()
+        temp2 = NamedTemporaryFile(suffix='.wav',delete_on_close=False)
         # Write the user's uploaded file to the temporary file.
         # The file will get deleted when it drops out of scope.
         handle.save(temp)
         # We extract the audio in the file
-        stream = ffmpeg.input(temp.name)
-        stream = ffmpeg.output(stream, temp2.name)
-        ffmpeg.run(stream, overwrite_output=True)
+        try: 
+            ffmpeg.input(temp.name) \
+                    .output(temp2.name)\
+                    .run(overwrite_output=True,capture_stdout=True, capture_stderr=True)
+        except ffmpeg.Error as e:
+            print('stderr:', e.stderr.decode('utf8'))
+
         # Let's get the transcript of the temporary file.
         segments, info = model.transcribe(temp2.name)
 
@@ -61,7 +70,7 @@ def handler():
         language = info[0]
         segments = list(segments)
 
-        subtitle_file = f"{filename}.{language}.srt"
+        subtitle_file = f"{fname}.{language}.srt"
         text = ""
         for index, segment in enumerate(segments):
             segment_start = format_time(segment.start)
@@ -74,6 +83,10 @@ def handler():
         f = open(subtitle_file, "w")
         f.write(text)
         f.close()
+
+        @app.after_request
+        def delete(response):
+            os.remove(f"{fname}.{language}.srt")
 
         return send_file(subtitle_file)
 
