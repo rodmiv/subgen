@@ -1,15 +1,17 @@
 FROM python:3.12.2-slim
 
-WORKDIR /python-docker
+WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN apt-get update && apt-get install git -y
-RUN pip3 install -r requirements.txt
-RUN pip3 install "git+https://github.com/openai/whisper.git" 
+RUN apt-get -y update
+RUN apt-get -y upgrade
 RUN apt-get install -y ffmpeg
+RUN pip3 install -r requirements.txt
+
 
 COPY . .
 
-EXPOSE 5000
+EXPOSE 5050
 
-CMD ["python3", "-m", "flask", "run", "--host=0.0.0.0"]
+CMD ["flask","--app","app", "run", "--host=0.0.0.0", "--port=5050"]

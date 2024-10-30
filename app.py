@@ -7,6 +7,7 @@ import math
 import ffmpeg
 import pathlib
 import os
+import traceback
 
 # Check if NVIDIA GPU is available
 torch.cuda.is_available()
@@ -56,12 +57,12 @@ def handler():
         # The file will get deleted when it drops out of scope.
         handle.save(temp)
         # We extract the audio in the file
-        try: 
-            ffmpeg.input(temp.name) \
-                    .output(temp2.name)\
-                    .run(overwrite_output=True,capture_stdout=True, capture_stderr=True)
-        except ffmpeg.Error as e:
-            print('stderr:', e.stderr.decode('utf8'))
+        try:
+            stream = ffmpeg.input(temp.name)
+            stream = ffmpeg.output(stream,temp2.name)
+            ffmpeg.run(stream, overwrite_output=True,capture_stdout=True, capture_stderr=True)
+        except Exception:
+            return str(traceback.format_exc())
 
         # Let's get the transcript of the temporary file.
         segments, info = model.transcribe(temp2.name)
@@ -89,4 +90,8 @@ def handler():
             os.remove(f"{fname}.{language}.srt")
 
         return send_file(subtitle_file)
+
+
+# if __name__=="__main__":
+#     app.run(debug=True,host="0.0.0.0",port=5050)
 
